@@ -250,7 +250,7 @@ pub fn initialize_networking<C:Center> (
         });
 
         let my_address = format!("{}:{}", addr.ip(), addr.port());
-        hosts1 = Arc::new(try!(c.register(my_index, my_address)));
+        hosts1 = Arc::new(try!(c.register(my_index, my_address, processes)));
     } else {
         let hosts = Arc::new(addresses);
         hosts1 = hosts.clone();

@@ -26,11 +26,11 @@ pub enum Configuration {
 /// current process use Center to register it's address(ip and listen port), and get addresses of other processes
 /// which's process index is greater than current process.
 pub trait Center {
-    fn register(&self, id : usize, address : String) -> ::std::io::Result<Vec<String>>;
+    fn register(&self, id : usize, address : String, total : usize) -> ::std::io::Result<Vec<String>>;
 }
 
 impl Center for () {
-    fn register(&self, _id: usize, _address: String) -> ::std::io::Result<Vec<String>> {
+    fn register(&self, _id: usize, _address: String, total: usize) -> ::std::io::Result<Vec<String>> {
         unimplemented!()
     }
 }
