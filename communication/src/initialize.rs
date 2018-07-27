@@ -20,6 +20,21 @@ pub enum Configuration {
     Cluster(usize, usize, Vec<String>, bool)
 }
 
+
+/// A Center client connect to some kinds of the Center Node which provide data persistence. eg. zookeeper.
+///
+/// current process use Center to register it's address(ip and listen port), and get addresses of other processes
+/// which's process index is greater than current process.
+pub trait Center {
+    fn register(&self, id : usize, address : String) -> ::std::io::Result<Vec<String>>;
+}
+
+impl Center for () {
+    fn register(&self, _id: usize, _address: String) -> ::std::io::Result<Vec<String>> {
+        unimplemented!()
+    }
+}
+
 #[cfg(feature = "arg_parse")]
 impl Configuration {
 
@@ -73,12 +88,12 @@ impl Configuration {
     }
 }
 
-fn create_allocators(config: Configuration, logger: Arc<Fn(::logging::CommsSetup)->::logging::CommsLogger+Send+Sync>) -> Result<Vec<Generic>,String> {
+fn create_allocators<C:Center>(config: Configuration, center : Option<&C>,logger: Arc<Fn(::logging::CommsSetup)->::logging::CommsLogger+Send+Sync>) -> Result<Vec<Generic>,String> {
     match config {
         Configuration::Thread => Ok(vec![Generic::Thread(Thread)]),
         Configuration::Process(threads) => Ok(Process::new_vector(threads).into_iter().map(Generic::Process).collect()),
         Configuration::Cluster(threads, process, addresses, report) => {
-            if let Ok(stuff) = initialize_networking(addresses, process, threads, report, logger) {
+            if let Ok(stuff) = initialize_networking(addresses, process, threads, report, center, logger) {
                 Ok(stuff.into_iter().map(Generic::Binary).collect())
             }
             else {
@@ -150,15 +165,15 @@ fn create_allocators(config: Configuration, logger: Arc<Fn(::logging::CommsSetup
 /// result: Ok(0)
 /// result: Ok(1)
 /// ```
-pub fn initialize<T:Send+'static, F: Fn(Generic)->T+Send+Sync+'static>(
+pub fn initialize<T:Send+'static, C: Center, F: Fn(Generic)->T+Send+Sync+'static> (
     config: Configuration,
+    center: Option<&C>,
     log_sender: Arc<Fn(::logging::CommsSetup)->::logging::CommsLogger+Send+Sync>,
     func: F,
 ) -> Result<WorkerGuards<T>,String> {
 
-    let allocators = try!(create_allocators(config, log_sender));
+    let allocators = try!(create_allocators(config, center, log_sender));
     let logic = Arc::new(func);
-
     let mut guards = Vec::new();
     for allocator in allocators.into_iter() {
         let clone = logic.clone();

@@ -1,6 +1,7 @@
 //! Starts a timely dataflow execution from configuration information and per-worker logic.
 
 use timely_communication::{initialize, Configuration, Allocator, WorkerGuards};
+use timely_communication::initialize::Center;
 use dataflow::scopes::{Root, Child};
 use logging::LoggerConfig;
 
@@ -52,7 +53,7 @@ where T: Send+'static,
       F: Fn(&mut Child<Root<Allocator>,u64>)->T+Send+Sync+'static {
     let logging_config: LoggerConfig = Default::default();
     let timely_logging = logging_config.timely_logging.clone();
-    let guards = initialize(Configuration::Thread, logging_config.communication_logging, move |allocator| {
+    let guards = initialize::<_,(),_>(Configuration::Thread, None, logging_config.communication_logging, move |allocator| {
         let mut root = Root::new(allocator, timely_logging.clone());
         let result = root.dataflow(|x| func(x));
         while root.step() { }
@@ -147,7 +148,7 @@ pub fn execute_logging<T, F>(config: Configuration, logging_config: LoggerConfig
 where T:Send+'static,
       F: Fn(&mut Root<Allocator>)->T+Send+Sync+'static {
     let timely_logging = logging_config.timely_logging.clone();
-    initialize(config, logging_config.communication_logging.clone(), move |allocator| {
+    initialize::<_,(),_>(config, None,  logging_config.communication_logging.clone(), move |allocator| {
         let mut root = Root::new(allocator, timely_logging.clone());
         let result = func(&mut root);
         while root.step() { }
@@ -236,6 +237,25 @@ pub fn execute_from_args_logging<I, T, F>(iter: I, logging_config: LoggerConfig,
     where I: Iterator<Item=String>,
           T:Send+'static,
           F: Fn(&mut Root<Allocator>)->T+Send+Sync+'static, {
-    execute_logging(try!(Configuration::from_args(iter)), logging_config, func)
+    execute_logging(try!(Configuration::from_args(iter)),logging_config, func)
 }
+
+///
+///  TODO : MORE DOCS
+pub fn execute_from_args_center_logging<I,T,F,C>(iter : I, center : &C, logging_config : LoggerConfig, func: F) -> Result<WorkerGuards<T>, String>
+    where  I: Iterator<Item=String>,
+           T: Send+'static,
+           C: Center,
+           F: Fn(&mut Root<Allocator>)-> T+Send+Sync+'static {
+    let timely_logging = logging_config.timely_logging.clone();
+    let config = try!(Configuration::from_args(iter));
+    initialize::<_,C,_>(config, Some(center),  logging_config.communication_logging.clone(), move |allocator| {
+        let mut root = Root::new(allocator, timely_logging.clone());
+        let result = func(&mut root);
+        while root.step() { }
+        result
+    })
+}
+
+
 

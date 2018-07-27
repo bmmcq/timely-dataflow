@@ -14,6 +14,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use allocator::{Process, Binary};
 use drain::DrainExt;
+use super::initialize::Center;
 
 // TODO : Much of this only relates to BinaryWriter/BinaryReader based communication, not networking.
 // TODO : Could be moved somewhere less networking-specific.
@@ -224,15 +225,40 @@ impl<T:Send> Switchboard<T> {
 }
 
 /// Initializes network connections
-pub fn initialize_networking(
-    addresses: Vec<String>, my_index: usize, threads: usize, noisy: bool, log_sender: Arc<Fn(::logging::CommsSetup)->::logging::CommsLogger+Send+Sync>) -> Result<Vec<Binary>> {
+pub fn initialize_networking<C:Center> (
+    addresses: Vec<String>, my_index: usize, threads: usize, noisy: bool, center: Option<&C>, log_sender: Arc<Fn(::logging::CommsSetup)->::logging::CommsLogger+Send+Sync>) -> Result<Vec<Binary>> {
 
-    let processes = addresses.len();
-    let hosts1 = Arc::new(addresses);
+    let processes = addresses.len(); // The processes should always equal to the number of processes user configured.
+    let hosts1;
+    let await_task;
+
+    if let Some(ref c) = center {
+        let listener = try!(TcpListener::bind("0.0.0.0:0"));
+        let addr = try!(listener.local_addr());
+
+        // start a new thread to await connection.
+        await_task = thread::spawn(move || {
+            let mut results: Vec<_> = (0..(processes - my_index - 1)).map(|_| None).collect();
+            for _ in (my_index + 1) .. processes {
+                let mut stream = try!(listener.accept()).0;
+                stream.set_nodelay(true).expect("set_nodelay call failed");
+                let identifier = try!(stream.read_u64::<LittleEndian>()) as usize;
+                results[identifier - my_index - 1] = Some(stream);
+                if noisy { println!("worker {}:\tconnection from worker {}", my_index, identifier); }
+            }
+            Ok(results)
+        });
+
+        let my_address = format!("{}:{}", addr.ip(), addr.port());
+        hosts1 = Arc::new(try!(c.register(my_index, my_address)));
+    } else {
+        let hosts = Arc::new(addresses);
+        hosts1 = hosts.clone();
+        await_task = thread::spawn(move || await_connections(hosts, my_index, noisy));
+    }
+
     let hosts2 = hosts1.clone();
-
-    let start_task = thread::spawn(move || start_connections(hosts1, my_index, noisy));
-    let await_task = thread::spawn(move || await_connections(hosts2, my_index, noisy));
+    let start_task = thread::spawn(move || start_connections(hosts2, my_index, noisy));
 
     let mut results = start_task.join().unwrap()?;
 
