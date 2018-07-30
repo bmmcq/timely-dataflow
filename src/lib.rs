@@ -63,8 +63,8 @@ extern crate timely_communication;
 extern crate time;
 extern crate byteorder;
 
-pub use execute::{execute, execute_logging, execute_from_args, execute_from_args_logging, example};
-pub use timely_communication::{Allocate, Push, Pull, Configuration};
+pub use execute::{execute, execute_logging, execute_from_args, execute_from_args_logging, example, execute_center_logging};
+pub use timely_communication::{Allocate, Push, Pull, Configuration, Center};
 pub use order::PartialOrder;
 
 pub mod progress;

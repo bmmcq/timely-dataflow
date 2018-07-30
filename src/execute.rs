@@ -242,13 +242,11 @@ pub fn execute_from_args_logging<I, T, F>(iter: I, logging_config: LoggerConfig,
 
 ///
 ///  TODO : MORE DOCS
-pub fn execute_from_args_center_logging<I,T,F,C>(iter : I, center : &C, logging_config : LoggerConfig, func: F) -> Result<WorkerGuards<T>, String>
-    where  I: Iterator<Item=String>,
-           T: Send+'static,
+pub fn execute_center_logging<T,F,C>(config : Configuration, center : &C, logging_config : LoggerConfig, func: F) -> Result<WorkerGuards<T>, String>
+    where  T: Send+'static,
            C: Center,
            F: Fn(&mut Root<Allocator>)-> T+Send+Sync+'static {
     let timely_logging = logging_config.timely_logging.clone();
-    let config = try!(Configuration::from_args(iter));
     initialize::<_,C,_>(config, Some(center),  logging_config.communication_logging.clone(), move |allocator| {
         let mut root = Root::new(allocator, timely_logging.clone());
         let result = func(&mut root);

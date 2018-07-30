@@ -6,6 +6,7 @@ use std::io::BufRead;
 #[cfg(feature = "arg_parse")]
 use getopts;
 use std::sync::Arc;
+use std::net::SocketAddr;
 
 use allocator::{Thread, Process, Generic};
 use networking::initialize_networking;
@@ -26,11 +27,11 @@ pub enum Configuration {
 /// current process use Center to register it's address(ip and listen port), and get addresses of other processes
 /// which's process index is greater than current process.
 pub trait Center {
-    fn register(&self, id : usize, address : String, total : usize) -> ::std::io::Result<Vec<String>>;
+    fn register(&self, id : usize, address : SocketAddr, total : usize) -> ::std::io::Result<Vec<String>>;
 }
 
 impl Center for () {
-    fn register(&self, _id: usize, _address: String, total: usize) -> ::std::io::Result<Vec<String>> {
+    fn register(&self, _id: usize, _address: SocketAddr, _total: usize) -> ::std::io::Result<Vec<String>> {
         unimplemented!()
     }
 }
